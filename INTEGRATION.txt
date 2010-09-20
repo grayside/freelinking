@@ -1,0 +1,50 @@
+# Integrating with Freelinking
+
+Freelinking provides a number of good hooks to build and expand on it's linking functionality. 
+This page covers a few tricks the Freelinking API allows.
+
+## Disabling or modifying a plugin for a given page
+You can disable or change plugin behavior on any page load by implementing hook_freelinking_alter().
+
+Just check for any conditions in the current page, and modify the plugin definition(s) as you like.
+For example, to turn off a given plugin in a given [space](http://drupal.org/project/spaces):
+
+<code>
+function spaces_freelinking_plugin_info_alter(&$plugins) {
+  $space = spaces_get_space();
+  if ($space->group->nid == 3) {
+    $plugins['nodetitle']['enabled'] = FALSE;
+  }
+}
+</code>
+
+Modify all indicators to remove two-letter indicators (to support language prefixing):
+
+<code>
+function locale_freelinking_plugin_info_alter(&$plugins) {
+  foreach ($plugins as &$plugin) {
+    // Array indicators outside an array are regular expressions.
+    if (is_array($plugin['indicator'])) {
+      foreach($plugin['indicator'] as $index => $indicator) {
+        if (str_len($indicator) == 2) {
+          unset($plugin['indicator'][$index]);
+        }
+      }
+      // Oops, removed all indicators.
+      if(empty($plugin['indicator'])) {
+        $plugin['indicator'][] = $plugin['plugin'];
+      }
+    }
+  }
+}
+</code>
+
+## Cleaning up markup for your theme.
+
+<code>
+function custom_freelinking_pre_render_alter(&$link, $target, $plugin) {
+  if ($plugin['user']) {
+    $link[2]['attributes']['style'] = 'user-link';
+  }
+}
+</code>

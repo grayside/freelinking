@@ -1,0 +1,24 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ *  Test link generation by default Freelinking plugins.
+ */
+class FreelinkingPluginTest extends DrupalWebTestCase {
+
+  function setup() {
+    parent::setup('freelinking');
+    
+    // Create admin user
+    // Create page node type.
+    // Create two page nodes.
+  }
+
+  function testNodetitlePlugin() {
+    // Update content item #1 with nodetitle type links
+    // Link 1: To the second node.
+    // Link 2: To a non-existent node.
+  }
+
+}

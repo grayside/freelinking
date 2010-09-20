@@ -1,0 +1,31 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ *  Install functions for Freelinking module.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function freelinking_install() {
+  drupal_set_mesage(st("Freelinking settings may be configured at !link. Remember to add the Freelinking filter to a !format.", array(
+    '!link' => l(st('Administer > Site Configuration > Freelinking'), 'admin/settings/freelinking'),
+    '!format' => l(st('Text Format'), 'admin/settings/filters')
+  )));
+}
+
+/**
+ * Implementation of hook_uninstall().
+ * @todo Properly handle format-specific settings.
+ */
+function freelinking_uninstall() {
+  foreach (_freelinking_load_settings() as $format => $vars) {
+    foreach ($vars as $name => $var) {
+      variable_del('freelinking_' . $name);
+    }
+  }
+  cache_clear_all(NULL, 'cache_filter');  
+}
+

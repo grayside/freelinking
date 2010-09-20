@@ -1,0 +1,184 @@
+# Developers
+
+Freelinking is a framework that connects flexible linking syntax with user
+interface, configuration, and syntax processing to build hyperlinks.
+
+## Plugins
+
+This section covers how to define a new plugin.
+
+### Getting Started
+Create a new module. [Creating modules](http://drupal.org/node/206753).
+
+You will be implementing Drupal functions known as "hooks" to define your
+plugin. Freelinking will use these specifically named functions to pull all
+plugins into it's system.
+
+All functions are defined in hook_freelinking_plugin_info(). The "hook" prefix
+of this function name should be replaced with your module's name.
+
+For this document, I will be using an imaginary module named "fl_custom" for
+this purpose.
+
+Since the plugin will be returning an array of plugin definitions, you should
+define your array. In our example, we will define 'example_plugin'. (Note that
+this 'machine name' of your plugin should preferably look like a function
+name--have no spaces, no capitals, no punctuation except underscores, and start
+with a letter or underscore.)
+
+At this point, your code should look like this:
+
+<?php
+/**
+ * Implementation of hook_freelinking_plugin_info().
+ */
+function fl_custom_freelinking_plugin_info() {}
+  $plugins = array();
+  
+  $plugins['example plugin'] = array(
+    // Plugin Definition Here
+  );
+  
+  return $plugins;
+?>
+
+### A Plugin Definition
+There are a number of elements available in defining a plugin. Several are
+required, and more are optional. At a minimum, you need a title, description,
+indicator, and a process.
+
+In the *Optional Plugin Elements* section, the optional ones will be described.
+For now, we will continue with the required elements.
+
+* **title**: The human-readable name of the plugin for use in user interfaces.
+Note that your title should be passed through t() so it is properly localized in
+multilingual sites.
+
+* **description**: The description of what your plugin does is used in the Admin
+interface and in the creation of filter tips. Filter tips are made available to
+the content creators actually using Freelinking, so a good description is very
+important. Your description should be passed through t() so it is properly
+localized in multilingual sites.
+
+* **indicator**: The indicator is a string or an array of strings that are used
+by Freelinking to identify when this particular plugin should be used to
+generate a link. The string is folded into an existing Regular Expression.
+
+* **process callback**: The process defines how the freelinking syntax will be
+converted. By default this will use `freelinking_external_url_processor()` and
+expect a *process argument* with the base_url. It can also be any callback
+function (as the name suggests), which is the standard practice for internal link
+plugins. Return value from this callback should mimic the parameters for l().
+
+<?php
+/**
+ * Implementation of hook_freelinking_plugin_info().
+ */
+function fl_custom_freelinking_plugin_info() {}
+  $plugins = array();
+  
+  $plugins['example_plugin'] = array(
+    'title' => t('My Example Plugin'),
+    'description' => t('Demonstrating how to define Freelinking plugins.'),
+    'indicator' => 'example',
+    'process arguments' => 'http://example.com/page/%s',
+  );
+  
+  return $plugins;
+?>
+
+In practice, you would use this plugin like `[[example:best]]` and Freelinking
+will generate `<a
+href="http://example.com/page/best">http://example.com/page/best</a>`.
+
+#### Optional Plugin Elements
+
+* **process arguments**: Arguments that are passed to the process callback. Not
+generally required, but the default process callback needs an argument here to
+create absolute URLs.
+
+* **access callback**: Access callback is used by the plugin to check whether
+access to the link should be granted. By default, internal links will use
+`freelinking_link_access()` and external links will be given a free ride.
+
+* **access arguments**: Arguments to pass to the access callback, in addition
+to the link path. Not entirely sure of the utility of this, might drop it without a good use case.
+
+* **settings callback**: You may define a settings callback function here. The callback function takes one argument--the definition of the plugin which calls it. It should return a Forms API array which will be folded into the Freelinking
+settings page. This is how you get configurable options for your plugin.
+
+* **translate**: Takes an array of replacement pairs to convert characters as
+needed for the plugin. For example, if spaces need to be underscores, you would
+set `'translate' => array(' ' => '_')`.
+
+* **link options**: Used to set default options for link construction. Matches
+the third parameter of l(). By default allows HTML text in links.
+
+* **syntax**: You can control the overall syntax of your plugin by selecting one
+of the options. By default, this includes [[Double Bracket]]  (`double_bracket`)
+and [Single Bracket]  (`single_bracket`). `hook_freelinking_syntax_alter()`
+can be used to change this syntax and add new ones your plugin might use. 
+If you set the syntax value to FREELINKING_PLUGIN_CUSTOM_SYNTAX,
+your indicator will be treated as a regular expression and applied as the entire
+syntax pattern to identify and invoke your plugin. Use this with caution, and be
+sure your plugin description describes the syntax for end-users.
+
+* **failover**: More complex plugins might fail for a number of reasons--no
+content matching the user-specific target, access control, and so on. By
+specifying a failover action (such as another plugin) Freelinking will pass on
+the processing "target" to that fallback.
+
+* **enabled**: You can define plugins that are only available for use by other
+plugins, such as for *failover*. By explicitly setting `$plugin['enabled'] =
+FALSE;`, the plugin's syntax will not be processed.
+
+<?php
+/**
+ * Implementation of hook_freelinking_plugin_info().
+ */
+function fl_custom_freelinking_plugin_info() {}
+  $plugins = array();
+  
+  $plugins['complex_plugin'] = array(
+    'title' => t('A Complex Plugin'),
+    'description' => t('Demonstrating how a more complex plugin looks.'),
+    'indicator' => 'complex',
+    'process' => 'fl_custom_complex_callback',
+    'settings' => 'fl_custom_complex_settings',
+    'syntax' => 'single_bracket',
+    'translate' => array('&' => ';'),
+    'failover' => 'example_plugin',
+  );
+  
+  return $plugins;
+?>
+
+### Callback Functions
+Explaination of the crafting of the various callbacks invoked by Freelinking on behalf of each plugin.
+
+#### Process Callback
+
+#### Settings Callback
+
+#### Access Callback
+
+## Freelink Target
+All the information gathered by processing user-submitted Freelinking syntax is
+put into a "target" object.
+
+There are three four general parts of a Target:
+
+1. Basic link info, such as the plugin specified by the user.
+2. Syntax arguments, such as the text or tooltip of the final link.
+3. Link history, such as plugins that have processed the target and passed it
+along, or the original version of the link arguments.
+
+target object ::
+ - 'tid': The target identifier. Computed as a hash of the syntax used and the plugin selected.
+ - 'raw': The literal matched text. Needed to replace with Freelinking results. A single target can include multiple raw texts to replace, in this way the addition of a little excess whitespace or other syntax variations inconsequential to processing will not result in redundant processing.
+ - 'indicator': Extracted indicator actually used in the text, collected in case a plugin wants to sneak some kind of contextual data into the indicator itself.
+ - 'process': Array of processing steps to pass through. Generally this will be one stop, but in the event of a macro concept their could be multiple processes here, each one producing results that should be appended to the final output.
+   - 'plugin': The plugin to be used.
+   - 'history': The history of plugins that have gone through processing, alongside their processing result. Possibly this will only be tracked if devel module is enabled. array('nodetitle' => 404, 'nid' => array('Bob's Page', 'node/32', array('html' => TRUE)))
+   - 'access denied': Whether any plugin in the processing history return access denied. This notes that the process should be re-run in any post-cache processing routine.
+   - 'result': The final result to be used in output. 

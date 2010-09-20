@@ -1,0 +1,6 @@
+; $Id: freelinking.info,v 1.1.4.1.4.4 2009/11/25 07:24:53 grayside Exp $ ;
+name = Freelinking
+description = A filter that allows flexible linking of content.
+package = Input filters
+core = 6.x
+dependencies[] = filter

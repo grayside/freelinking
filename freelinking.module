@@ -1,0 +1,226 @@
+<?php
+// $Id: freelinking.module,v 1.32.2.11.2.2.2.28 2010/05/04 16:19:02 grayside Exp $
+
+/**
+ * Freelinking 3
+ *
+ * @file
+ *   Provides flexible, extensible linking of content, wiki-style
+ */
+define('FREELINKING_PLUGIN_CUSTOM_SYNTAX', 'regex');
+
+module_load_include('inc', 'freelinking', 'freelinking.plugin');
+
+/**
+ * Implementation of hook_menu().
+ */
+function freelinking_menu() {
+  $items['admin/settings/freelinking'] = array(
+    'title' => 'Freelinking settings',
+    'description' => 'Configure settings for the freelinking input filter',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('freelinking_settings'),
+    'access arguments' => array('administer filters'),
+    'file' => 'freelinking.admin.inc',
+  );
+  return $items;
+} // end function freelinking_menu
+
+/**
+ * Implementation of hook_filter().
+ * @todo Move freelinking_get_syntax_patterns into freelinking_get_plugins().
+ */
+function freelinking_filter($op, $delta = 0, $format = -1,  $text = '',
+                                     $langcode = '', $cache_id = 0) {
+  switch ($op) {
+    case 'list':
+      return array(0 => 'Freelinking filter');
+
+    case 'no cache':
+      return freelinking_variable_get('disable_cache', $format);
+
+    case 'description':
+      return t('Easy creation of hyperlinks by node title and more.');
+
+    case 'prepare':
+      return $text;
+
+    case 'process':
+      module_load_include('inc', 'freelinking', 'freelinking');
+      $patterns = freelinking_get_syntax_patterns();
+      $plugins = freelinking_get_plugins($format, $patterns);
+      $targets = freelinking_get_link_targets($text, $plugins, $format);
+      return freelinking_process_text($text, $targets, $format);
+
+    case 'settings':
+      $plugins = freelinking_get_plugins($format);
+      return freelinking_format_settings($format, $plugins);
+  } // end switch
+} // end function freelinking_filter
+
+/**
+ * Implementation of hook_filter_tips().
+ * @todo Use indicator from plugin definition for more complete long tips.
+ */
+function freelinking_filter_tips($delta, $format, $long = FALSE) {
+  $plugins = freelinking_get_plugins($format);
+  freelinking_purge_disabled_plugins($plugins);
+  $patterns = freelinking_get_syntax_patterns();
+
+  if (!$long) {
+    return _freelinking_tips_short($plugins, $patterns,
+       freelinking_variable_get('default_plugins', $format));
+  }
+
+  $tips = array();
+  foreach ($plugins as $plugin) {
+    if ($plugin['syntax'] != FREELINKING_PLUGIN_CUSTOM_SYNTAX) {
+      $syntax_tip = '<em>' . $patterns[$plugin['syntax']] . '</em> — ';
+    }
+    $tips[] = '<strong>' . $plugin['title'] . ': </strong>' . $syntax_tip . $plugin['description'];
+  }
+
+  // This is only for filter tips, otherwise it would be a theme function.
+  $text = '<h4>' . t('Freelinking') . '</h4>' . t('Freelinking helps you easily create HTML links.');
+  $text .= '<p>' . t('Below is a list of available types of freelinks you may use.') . '</p>';
+  $text .= theme('item_list', $tips);
+
+  return $text;
+} // end function freelinking_filter_tips
+
+/**
+ * Generate "short" filter tips to display freelinking defaults.
+ */
+function _freelinking_tips_short($plugins, $patterns, $defaults) {
+  $tips = array();
+  foreach ($defaults as $syntax => $plugin) {
+    if ($plugin['syntax'] != FREELINKING_PLUGIN_CUSTOM_SYNTAX) {
+      $tip = $patterns[$syntax]['title'] . ' — ';
+    }
+    else {
+      $tip .= $plugins[$plugin]['title'];
+    }
+    $tips[] = $tip;
+  }
+  return implode(', ', $tips);
+} // end function _freelinking_tips_short
+
+/**
+ * Identify all syntax possibilities for a freelink-style link.
+ *
+ * @return
+ *  Array of syntax patterns for use by Freelinking plugins.
+ *
+ * @todo
+ *  As mentioned in _freelinking_assign_syntax(), make the indicator separator
+ *  configurable. This should be done with a 'separator' element in the pattern
+ *  definition array.
+ */
+function freelinking_get_syntax_patterns() {
+  static $patterns;
+  
+  if (!empty($patterns)) {
+    return $patterns;
+  }
+  
+  $patterns = array();
+  $patterns['double_bracket'] = array(
+    'title' => t('[[Double Bracket]]'),
+    'value' => '/(?<!\\\\)\[\[@INDICATOR@(.+)]]/Uu',
+  );
+  $patterns['single_bracket'] = array(
+    'title' => t('[[Single Bracket]]'),
+    'value' => '/(?<!\\\\)\[@INDICATOR@(.+)]/Uu',
+  );
+  drupal_alter('freelinking_syntax', $patterns);
+
+  // 'regex' is a reserved pattern name used when indicators define an entire syntax pattern..
+  $patterns[FREELINKING_PLUGIN_CUSTOM_SYNTAX] = FREELINKING_PLUGIN_CUSTOM_SYNTAX;
+
+  return $patterns;
+} // end function freelinking_get_syntax_patterns
+
+/**
+ * Retrieve Freelinking settings.
+ * 
+ * @param $setting
+ *  The name of the variable (without any dynamic suffix)
+ * @param $format
+ *  Specific format for which to get the setting.
+ *  Access'freelinking_default_plugins_format_3' with format_get_setting('default_plugins', 3).
+ * @param $key
+ *  If the setting is an array, it will retrieve the specified index value.
+ * @return
+ *  Mixed. The stored value for the given setting.
+ */
+function freelinking_variable_get($setting, $format = NULL, $key = NULL ) {
+  static $variables;
+
+  $format = empty($format) || $format == -1 ? 'all' : $format;
+  
+  if (empty($variables)) {
+    $variables = array_merge($variables, _freelinking_load_settings());
+  }
+
+  if (is_array($variables[$setting]) && isset($key)) {
+    return $variables[$format][$setting][$key];
+  }
+  return $variables[$format][$setting];
+} // end function freelinking_variable_get
+
+/**
+ * Central definition of freelinking settings.
+ * @todo If no format-specific settings are implemented, rework this code and don't bother with the overhead.
+ */
+function _freelinking_load_settings() {
+	$vars['all']['default_plugins'] = variable_get('freelinking_default_plugins',
+		array('double_bracket' => 'nodetitle', 'single_bracket' => 'nid'));
+	$vars['all']['disable_cache'] = variable_get('freelinking_disable_cache', FALSE);
+	$vars['all']['enrich_links'] = variable_get('freelinking_enrich_links', FALSE);
+	$vars['all']['plugin_' . $name . '_enabled'] = variable_get('freelinking_plugin_' . $name . '_enabled', TRUE);
+
+  foreach (filter_formats() as $format => $title) {
+    $vars[$format] = $vars['all'];
+  }
+  return $vars;
+} // end function _freelinking_load_settings
+
+// Theming //
+
+/**
+ * Implementation of hook_theme().
+ */
+function freelinking_theme() {
+  return array(
+    'freelinking' => array('theme_freelinking', 'plugin' => NULL, 'link' => NULL),
+    'freelinking_message' => array('theme_freelinking_message', 'plugin' => NULL, 'text' => NULL),
+  );
+}
+
+/**
+ * Theme the Freelink
+ */
+function theme_freelinking($plugin = NULL, $link = NULL) {
+  if ($link['extra']) {
+    $prefix = $link['extra']['prefix'];
+    $suffix = $link['extra']['suffix'];
+    unset($link['extra']);
+  }
+  
+  $rendered = $prefix . call_user_func_array('l', $link) . $suffix;
+  return $rendered;
+}
+
+/**
+ * Theme the error message
+ */
+function theme_freelinking_message($plugin = NULL, $text = NULL) {
+  if ($text) {
+    $text = ': ' . $text;
+  }
+  return '<code class="freelink freelink-message'
+    . ' freelink-message-' . $plugin . '">'
+    .  $text . '</code>';
+}
+
+// vim: tw=300 nowrap syn=php

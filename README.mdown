@@ -1,0 +1,10 @@
+# Freelinking
+
+This is code is intended as the next Alpha release of Freelinking 3.x. It is a ground-up rewrite, but since the intended 
+functionality is the same as what currently exists in 3.x, the branch is not incremented.
+
+More README coming soon, probably copied from the existing one.
+
+## NOT FUNCTIONING
+Note that this code is not functioning. Not only is it probably buggy six ways from Tuesday, it doesn't have fully implemented 
+plugins!
