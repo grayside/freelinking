@@ -185,8 +185,7 @@ target object ::
  - 'args': Arguments passed in by the syntax, including such things as link 
    target, text, tooltip, and miscellaneous arguments an individual plugin might 
    know how to handle.
- - 'cached': Signifies that this target is or is not being processed in a 
-   caching context.
+ - 'post-process': Signifies that this target is being processed a second time, such as to avoid caching restrictions.
  - 'access denied': Whether any plugin in the processing history return access 
    denied. This notes that the process should be re-run in any post-cache 
    processing routine.
