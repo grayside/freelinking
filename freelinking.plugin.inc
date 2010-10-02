@@ -224,36 +224,28 @@ function freelinking_external_url_processor($target, $plugin) {
  * Access control pre-caching should always be based on anonymous user.
  * Access control post-cache should use the currently logged in user (which in most access checks is based on a NULL account.)
  *
- * @param $object
- *  The object to check for view access by the user.
- * @param $type
- *  The type of access check.
- * @param $post_cache
- *  Whether the access check is currently in a second-round, post-cache state.
+ * @param $path
+ *  An internal Drupal path for which to check access.
+ * @param $cache
+ *  Specify whether the function is being called from a cached or un-cached context.
+ *  If cached, the code should treat the user as anonymous. If uncached, it can do a
+ *  proper access check. This information could theoretically be pulled from the general
+ *  context at the time the function is called, but for now it will be pulled from the
+ *  $target object being processed at the time this is called, at least as far as standard
+ *  text processing by Freelinking is concerned. Defaults to cached.
  *
  * @return
  *  Boolean value to determine access.
- *
- * @todo
- *  1. Switch to menu_get_item() so the menu systme can handle the specifics of the check by path. This requires an answer to anonymous user checking.
  */
-function freelinking_link_access($object, $type = 'node', $cache = TRUE) {
-  if ($cache) {
-    $account = drupal_anonymous_user();
+function freelinking_link_access($path, $cached = TRUE) {
+  if ($cached) {
+    // Ideally, anonymous user would be loaded and used as the basis for an access check.
+    // Unfortunately, the menu access mechanism would require some loopedy-loops. Until
+    // it is clear what the performance impact would be, that is postponed.
+    return FALSE
   }
-  else {
-    $account = $GLOBALS['user'];
-  }
-  
-  switch ($type) {
-    case 'node':
-      return node_access('view', $object, $account);
-    case 'perm':
-      return user_access($object, $account);
-  }
-
-  // secure default
-  return FALSE;
+  $item = menu_get_item($path);
+  return $item['access'];
 }
 
 /**
