@@ -9,6 +9,11 @@
 /**
  * Process linking syntax into HTML links.
  *
+ * @param $patterns
+ *  Collect syntax patterns used to analyze text for Freelinking syntax.
+ * @param $format
+ *  The currently active input format.
+ *
  * @return
  *  Filter text with links in place of freelinking syntax.
  *
@@ -17,17 +22,23 @@
  *  to route processing based on plugin type. This will allow support of macros
  *  like {{dp:token}} to build links to project, usage, issue queue, and commit log.
  */
-function freelinking_process_text($text, $targets, $format) {
+function freelinking_process_text($patterns, $format) {
+	$plugins = freelinking_get_plugins($format, $patterns);
+	$targets = freelinking_get_link_targets($text, $plugins, $format);
+
   foreach ($targets as $target) {
     $rendered = freelinking_get_link($target, $format);
     if ($rendered) {
       // If the target was marked for post-processing, store it for later use.
-      if ($target['post process'] == FREELINKING_ERROR_ACCESS_DENIED) {
+      if ($target->access_denied == FREELINKING_ERROR_ACCESS_DENIED) {
+        $target->post_process = TRUE;
         freelinking_store_post_cache_target($target);
       }
 
-      // Replace every link with identical syntax results.
-      foreach ($target['raw'] as $raw) {
+      // Replace every link with effectively identical syntax with the same link.
+      // This is done here because if the $target needs to be rerun in post-process,
+      // the new text will be swapped for whatever was generated in $rendered.
+      foreach ($target->raw as $raw) {
         $text = str_replace($raw, $rendered, $text);
       }
     }
@@ -38,10 +49,21 @@ function freelinking_process_text($text, $targets, $format) {
 /**
  * Collect and process text for freelinking syntax.
  *
+ * The entire text is checked over for any defined Freelinking syntax, one
+ * active plugin at a time. All instances of a given plugin's syntax are broken
+ * down and saved to a target object, which is processed once for all effectively
+ * identical syntax.
+ *
+ * @param $text
+ *  The text submitted to the filter for processing.
+ * @param $plugins
+ *  The set of all plugins known to Freelinking. 
+ * @param $format
+ *  The currently active input format.
+ *
  * @todo
  *  1. If disable_cache = TRUE, cache the targets based on $text.
- *  2. Parameter mismatch in get_target_hash
- *  3. Assign plugin name to each process. In the event of a macro use the plugins structure to assign plugins.
+ *  2. Assign plugin name to each process. In the event of a macro use the plugins structure to assign plugins.
  */
 function freelinking_get_link_targets($text, $plugins, $format) {
   // Only enabled plugins are needed for syntax processing.
@@ -73,6 +95,12 @@ function freelinking_get_link_targets($text, $plugins, $format) {
 
 /**
  * Parse target for secondary link arguments.
+ *
+ * There are two types of argument. The first three arguments that are not
+ * explicitly assigned a key are the "destination" argument, link text, and tooltip.
+ * Explicitly "keyed" values (|key=value|) are saved as such. Any additional
+ * un-keyed values are dumped into an 'other' array, and are assumed to have
+ * a specific order and significance understood by specific plugins.
  *
  * This is raw user input and needs to be checked by the HTML Filter.
  *
@@ -130,10 +158,12 @@ function freelinking_parse_target($target, $plugin = NULL) {
   $args['text'] = urldecode($args['text']);
   $args['tooltip'] = urldecode($args['tooltip']);
 
-  // Extra parsing for goto.
+  // Extra parsing for goto. By separating the fragment, it's possible to have a clean
+  // destination argument, and also easily slide the hash back on. Useful for internal
+  // links where the path needs to be looked up.
   list ($goto, $fragment) = explode('#', $args['goto']);
   $args['goto'] = $goto;
-  if (isset($fragment)) { 
+  if (isset($fragment)) {
     $args['fragment'] = $fragment;
   }
 
@@ -149,8 +179,6 @@ function freelinking_parse_target($target, $plugin = NULL) {
 /**
  * Process the target text into a link with the specified plugin.
  *
- * @param $plugin
- *   The name of the plugin to be used to render the link.
  * @param $target
  *   The target text extracted from the freelink. Array.
  * @param $format
@@ -163,6 +191,7 @@ function freelinking_parse_target($target, $plugin = NULL) {
  * @see l
  */
 function freelinking_get_link($target, $format = NULL) {
+  // All plugins are needed to support processing failover to other, arbitrary plugins.
   $plugins = freelinking_get_plugins($format);
 
   // Apply plugin processing to the target. The initial plugin is the first in 'trace'.
@@ -171,7 +200,8 @@ function freelinking_get_link($target, $format = NULL) {
   if (is_array($link)) {
     drupal_alter('freelink_pre_render', $link, $target, $plugins);
   }
-  // If the "link" is straight text, pass it through. Allows module developers to leverage the FL syntax/plugin infrastructure.
+  // If the "link" is straight text, pass it through. Allows module developers
+  // to leverage the FL syntax/plugin infrastructure without link-specific processing.
   elseif (!empty($link)) {
     return $link;
   }
@@ -188,7 +218,23 @@ function freelinking_get_link($target, $format = NULL) {
 }
 
 /**
- * Construct a link out of the $target with the specified plugin
+ * Construct a link out of the $target with the specified plugin.
+ *
+ * This function does the text processing for a specific target.
+ * It works recursively to handle plugin failover.
+ *
+ * @param $target
+ *  The link target object.
+ * @param $plugins
+ *  All the Freelinking plugins.
+ *
+ * @return
+ *  One of the following:
+ *   - Array defining an error response
+ *   - Array defining arguments for a link generated with l()
+ *   - Scalar value holding arbitrary text. (This is an intended gap in the
+ *     link-specific structure to allow Freelinking's sophisticated filtration/plugin
+ *     mechanism to be used for other purposes.)
  */
 function _freelinking_build_link($target, $plugins) {
   // Get the current plugin.
@@ -199,9 +245,10 @@ function _freelinking_build_link($target, $plugins) {
     return array('failover' => 'error', 'message' => t('Missing Plugin'));
   }
 
-  // run the text through translation
+  // Run the text through translation.
   if ($plugin['translate']) {
     if (empty($target->old_args['original']['goto']['original_goto']) {
+    /// shouldn't this be using $target->process[]?
       $target->old_args['original']['goto'] = $target->args['goto'];
     }
     $translate = $target->old_args['original']['goto'] ? $target->old_args['original']['goto'] : $target->args['goto'];

@@ -47,10 +47,7 @@ function freelinking_filter($op, $delta = 0, $format = -1,  $text = '',
 
     case 'process':
       module_load_include('inc', 'freelinking', 'freelinking');
-      $patterns = freelinking_get_syntax_patterns();
-      $plugins = freelinking_get_plugins($format, $patterns);
-      $targets = freelinking_get_link_targets($text, $plugins, $format);
-      return freelinking_process_text($text, $targets, $format);
+      return freelinking_process_text(freelinking_get_syntax_patterns(), $format);
 
     case 'settings':
       $plugins = freelinking_get_plugins($format);
