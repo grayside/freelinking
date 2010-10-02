@@ -41,6 +41,7 @@ function freelinking_process_text($text, $targets, $format) {
  * @todo
  *  1. If disable_cache = TRUE, cache the targets based on $text.
  *  2. Parameter mismatch in get_target_hash
+ *  3. Assign plugin name to each process. In the event of a macro use the plugins structure to assign plugins.
  */
 function freelinking_get_link_targets($text, $plugins, $format) {
   // Only enabled plugins are needed for syntax processing.
@@ -82,6 +83,10 @@ function freelinking_get_link_targets($text, $plugins, $format) {
  *
  * @return
  *  Array of arguments.
+ *
+ * @todo
+ *  1. Be sure preg_split and str_replace strings are working properly.
+ *  2. Review whether xss/etc checks need to be put in place.
  */
 function freelinking_parse_target($target, $plugin = NULL) {
   $separator = '|';
@@ -89,13 +94,13 @@ function freelinking_parse_target($target, $plugin = NULL) {
   $args = array();
 
   // Allow escaped pipe's through.
-  $items = preg_split('/(?<!\\)\' . $separator . '/S', $target);
+  $items = preg_split("/(?<!\\)\{$separator}/S", $target);
  
   // The first three unspecified arguments will be used in a specific way.
   $index = 0;
   foreach ($items as $key => $item) {
     // un-escape seaparator
-    $item = str_replace('\' . $separator, $separator, $item);
+    $item = str_replace("\{$separator}", $separator, $item);
 
     // Get specified arguments.
     if (strpos($item, '=')) {
@@ -301,4 +306,3 @@ function freelinking_store_post_process_target($target = NULL, $clear = FALSE) {
 function _freelinking_get_target_hash($target) {
   return $target->plugin . ':' . serialize($target->args);
 }
-
