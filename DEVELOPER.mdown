@@ -187,6 +187,9 @@ target object ::
    know how to handle.
  - 'cached': Signifies that this target is or is not being processed in a 
    caching context.
+ - 'access denied': Whether any plugin in the processing history return access 
+   denied. This notes that the process should be re-run in any post-cache 
+   processing routine.
  - 'process': Array of processing steps to pass through. Generally this will be 
    one stop, but in the event of a macro concept their could be multiple processes 
    here, each one producing results that should be appended to the final output.
@@ -195,7 +198,4 @@ target object ::
      alongside their processing result. Possibly this will only be tracked if devel 
      module is enabled. array('nodetitle' => 404, 'nid' => array('Bob's Page', 
      'node/32', array('html' => TRUE)))
-   - 'access denied': Whether any plugin in the processing history return access 
-     denied. This notes that the process should be re-run in any post-cache 
-     processing routine.
    - 'result': The final result to be used in output. 
