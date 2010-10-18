@@ -1,60 +1,74 @@
 <?php
+// $Id: freelinking.api.php,v 1.1.2.8 2010/05/04 16:19:02 grayside Exp $
+/**
+ * Freelinking 3 API
+ *
+ * @file
+ *   API for Freelinking 3. These functions are subject to change without 
+ * warning for all Alpha releases.
+ */
 
 /**
- * Define link plugins for the Freelinking module.
- * Every plugin defines elements of the Freelinking UI and syntax processing.
+ * hook_freelinking() is used to define plugins or add new values to plugins.
  *
+ * For more on creating or modifying plugins, check the documentation.
+ *
+ * @see http://drupal.org/node/???
+ */
+function hook_freelinking() {
+  $plugins['myplugin'] => array(
+    'indicator' => '/myplugin/',
+    'translate' => array(' ' => '_'),
+    'replacement' => 'http://example.com/node/%1',
+  );
+  return $plugins;
+}
+
+/**
+ * hook_freelink_alter() is used to modify the array of link values
+ * that are eventually passed on to the theme functions to become links.
+ *
+ * Error messages and strings returned from plugins are not processed by 
+ * this hook. Errors are directly themed and returned, and strings are
+ * simply passed back to the text. (In the latter "mode", freelinking
+ * could be used to generate something other than a link.)
+ *
+ * @param $link
+ *  Array suitable for passing to l().
+ *
+ * @param $target
+ *  Array of information from parsed linking syntax.
+ *
+ * @param $plugin_name
+ *  String of the name of the freelinking plugin that created the current link.
+ *
+ * @plugin
+ *  The plugin definition (array) of the freelinking plugin that created the
+ * current link.
+ * 
  * @return
- *  An array of plugins, each defined as an array indexed on it's machine name.
- * @see PLUGINS.mdown
+ *  Array suitable for passing to l().
+ *
+ * @see http://drupal.org/node/???
  */
-function hook_freelinking_plugin_info() {
-  $plugins = array();
-  
-  $wp = variable_get('freelinking_wikipedia', array());
-  $language = empty($wp['language']) ? language_default('language') : $wp['language'];
-  $plugin['wikipedia'] = array(
-    'title' => t('Wikipedia'),
-    'description' => t('Create links to Wikipedia articles.'),
-    'indicator' => array('wp', 'wiki', 'wikipedia'),
-    'process argument' => 'http://' . $language . '.wikipedia.org/wiki/%s',
-    // Configure the language variable
-    'settings' => array('freelinking_settings_wikipedia'),
-  );
-  
-  // Callback-based plugin.
-  $plugin['nid'] = array(
-    'title' => t('NID'),
-    'description' => t('Link to a Node by Node ID Number.'),
-    'indicator' => 'nid',
-    'callback' => 'freelinking_callback_nid',
-    'syntax' => 'single_bracket',
-  );
-  
-  return $plugins
+function hook_freelink_alter(&$link, $target, $plugin_name, $plugin) {
+  if ($plugin_name == 'stark_link') {
+    unset($link[2]['attributes']['class']);
+    unset($link[2]['attributes']['title']);
+  }
+  elseif ($plugin_name == 'green_link') {
+    $link[2]['attributes']['class'] .= ' green';
+  }
 }
 
 /**
- * Make changes to Freelinking plugin definitions.
+ * Individual modules may implement a theme_freelink_pluginname().
+ * Doing so will override the standard theme_freelink().
+ * Modules must still implement hook_theme to declare their theme function.
  *
- * This works a lot like hook_menu_alter(), allowing any aspect of a plugin to
- * be changed or swapped out. You could also add new plugins here, but they
- * would skip certain processing steps that the developer would then become
- * responsible for.
- *
- * Currently plugins are held as a static variable for performance, therefore this
- * only gets called once per page load.
- *
- * @param $plugins
- *  Array of sanitized plugins.
+ * In this example, the "pluginname" plugin is themed to become an image
+ * to the targeted URL, instead of a link.
  */
-function hook_freelinking_plugin_info_alter(&$plugins) {
-  $plugin['wikipedia']['title'] = t('Encyclopedia');
+function theme_freelink_pluginname($link) {
+  return theme('image', $link[1], $link[0], $link[2]['attributes']['title']);
 }
-
-/**
- * I
- */
-function hook_freelinking_syntax_alter(&$patterns) {}
-
-function hook_freelink_pre_render_alter(&$link, $target, $plugins) {}
