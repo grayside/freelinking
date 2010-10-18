@@ -11,7 +11,7 @@
  */
 define('FREELINKING_ERROR_NOT_FOUND', 404);
 define('FREELINKING_ERROR_ACCESS_DENIED', 403);
-define('FREELINKING_ERROR_BAD_REQUEST', 400 )
+define('FREELINKING_ERROR_BAD_REQUEST', 400 );
 
 /**
  * Generates an array of Freelinking plugins for link generation.
@@ -242,7 +242,7 @@ function freelinking_link_access($path, $cached = TRUE) {
     // Ideally, anonymous user would be loaded and used as the basis for an access check.
     // Unfortunately, the menu access mechanism would require some loopedy-loops. Until
     // it is clear what the performance impact would be, that is postponed.
-    return FALSE
+    return FALSE;
   }
   $item = menu_get_item($path);
   return $item['access'];
@@ -286,7 +286,7 @@ function _freelinking_validate_plugin($plugin, $patterns) {
   }
 
   if (isset($plugin['translate']) && !is_array($plugin['translate'])) {
-    $reason[] = t('translate should be an array')
+    $reason[] = t('translate should be an array');
   }
   
   if(isset($plugin['syntax']) && !in_array($plugin['syntax'], array_keys($patterns))) {
@@ -294,8 +294,8 @@ function _freelinking_validate_plugin($plugin, $patterns) {
   }
 
   if (!empty($reason)) {
-    drupal_set_message(t('Freelinking plugin "!plugin" is invalid. See the !log for details.',
-      array('!plugin' => $index, '!log' => l(t('log'), 'admin/reports/dblog'), 'warning');      
+    drupal_set_message(t('Freelinking plugin "!plugin" is invalid. See the !log for details.', 
+      array('!plugin' => $index, '!log' => l(t('log'), 'admin/reports/dblog'))), 'warning');      
     watchdog('filter', 'Freelinking plugin "!plugin" is invalid: ' . implode(', ', $reason),
       array('!plugin' => $index), WATCHDOG_WARNING);
     return FALSE;

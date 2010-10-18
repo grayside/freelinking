@@ -41,7 +41,7 @@ function freelinking_settings() {
       '#type'  => 'fieldset',
       '#collapsible' => TRUE,
       '#collapsed' => FALSE,
-      '#tree' = TRUE,
+      '#tree' => TRUE,
     );
     
     foreach ($plugin['settings'] as $function) {
@@ -83,14 +83,14 @@ function _freelinking_default_plugins_form($format = 'all') {
   
   $form['freelinking_default_plugin_format_' . $format] = array(
     '#title' => t('Default Plugin by Pattern'),
-    '#description' => t('Each syntax pattern may be assigned a default plugin. A default plugin does not need to have an indicator specified.');
+    '#description' => t('Each syntax pattern may be assigned a default plugin. A default plugin does not need to have an indicator specified.'),
     '#tree' => TRUE,
   );  
   
   foreach($patterns as $name => $pattern) {
     $form['freelinking_default_plugin_format' . $format][$name] = array(
       '#title' => t('!pattern default', array('!pattern' => $pattern['title'])),
-      '#type' => 'select';
+      '#type' => 'select',
       '#default_value' => freelinking_variable_get('default_plugins', $format, $name),
       '#options' => _freelinking_plugin_options('enabled', $format),
       '#multiple' => FALSE,

@@ -10,7 +10,7 @@
  * Implementation of hook_install().
  */
 function freelinking_install() {
-  drupal_set_mesage(st("Freelinking settings may be configured at !link. Remember to add the Freelinking filter to a !format.", array(
+  drupal_set_message(st("Freelinking settings may be configured at !link. Remember to add the Freelinking filter to a !format.", array(
     '!link' => l(st('Administer > Site Configuration > Freelinking'), 'admin/settings/freelinking'),
     '!format' => l(st('Text Format'), 'admin/settings/filters')
   )));
