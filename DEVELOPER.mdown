@@ -95,7 +95,7 @@ href="http://example.com/page/best">http://example.com/page/best</a>`.
 
 * **process arguments**: Arguments that are passed to the process callback. Not
 generally required, but the default process callback needs an argument here to
-create absolute URLs.
+create absolute URLs. They should go in this element as a matter of simplicity and to avoid namespace clobbering in the plugin definition.
 
 * **access callback**: Access callback is used by the plugin to check whether
 access to the link should be granted. By default, internal links will use
@@ -173,7 +173,7 @@ There are three four general parts of a Target:
 3. Link history, such as plugins that have processed the target and passed it
 along, or the original version of the link arguments.
 
-target object ::
+### Target Object Definition
  - 'tid': The target identifier. Computed as a hash of the syntax used and the 
    plugin selected.
  - 'raw': The literal matched text. Needed to replace with Freelinking results. 
@@ -185,16 +185,26 @@ target object ::
  - 'args': Arguments passed in by the syntax, including such things as link 
    target, text, tooltip, and miscellaneous arguments an individual plugin might 
    know how to handle.
- - 'post_process': Signifies that this target is being processed a second time, such as to avoid caching restrictions.
- - 'access_denied': Whether any plugin in the processing history return access 
-   denied. This notes that the process should be re-run in any post-cache 
-   processing routine.
- - 'process': Array of processing steps to pass through. Generally this will be 
-   one stop, but in the event of a macro concept their could be multiple processes 
-   here, each one producing results that should be appended to the final output.
-   - 'plugin': The plugin to be used.
-   - 'history': The history of plugins that have gone through processing, 
-     alongside their processing result. Possibly this will only be tracked if devel 
-     module is enabled. array('nodetitle' => 404, 'nid' => array('Bob's Page', 
-     'node/32', array('html' => TRUE)))
-   - 'result': The final result to be used in output. 
+ - 'plugin': The plugin invoked by the link syntax, either directly by the indicator or by configuration of the no-indicator default for the syntax used.
+ - 'post_process': Set to TRUE to mark the target as expecting to operate in a post-processing phase. Generally used on access-denied links that should be rechecked after cached values are applied.
+ - 'link': An array suitable for processing into an HTML link, as by the l() function.
+ - 'process': indexed with a serial identifier
+   - 'plugin': The FL plugin being used for this process cycle.
+   - 'args': The arguments as translated for use by the specified plugin.
+   - 'result': The result of this processing. An array containing various elements
+   
+   
+### Target Object Life Cycle 
+ 1. The base values are computed and stored, this includes tid, raw (as an array), indicator, args, plugin, post_process.
+ 2. As the link is processed, each plugin is assigned an entry in the process array.
+ 3. If the result code indicates access denied, the main 'post_process' flag is set to TRUE.
+ 4. In the end, the result value for the last element in the process array is assigned to the $target->link field.
+ 
+ 
+ Not quite right.::
+ Step 1: Process the text to a hash.
+ Step 2: Check if targets are stored for this hash. If so, load zee targets.
+ Step 3: Process the targets. If this code is running, the cache is not a problem. This should result in replacement texts.
+ Step 4: Store processed targets. If need be this might be a cache hit at 2 instead of unprocessed targets.
+ Step 5: 
+ 

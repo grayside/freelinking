@@ -7,6 +7,15 @@
  */
 
 /**
+ * Constants are used as plugin faiover return values.
+ */
+define('FREELINKING_ERROR_NOT_FOUND', 404);
+define('FREELINKING_ERROR_ACCESS_DENIED', 403);
+define('FREELINKING_ERROR_BAD_REQUEST', 400 )
+define('FREELINKING_ERROR', 'error');
+define('FREELINKING_CLEAN_TEXT', 'none');
+
+/**
  * Process linking syntax into HTML links.
  *
  * @param $patterns
@@ -30,8 +39,7 @@ function freelinking_process_text($patterns, $format) {
     $rendered = freelinking_get_link($target, $format);
     if ($rendered) {
       // If the target was marked for post-processing, store it for later use.
-      if ($target->access_denied == FREELINKING_ERROR_ACCESS_DENIED) {
-        $target->post_process = TRUE;
+      if ($target->post_process) {
         freelinking_store_post_cache_target($target);
       }
 
@@ -194,7 +202,9 @@ function freelinking_get_link($target, $format = NULL) {
   // All plugins are needed to support processing failover to other, arbitrary plugins.
   $plugins = freelinking_get_plugins($format);
 
-  // Apply plugin processing to the target. The initial plugin is the first in 'trace'.
+  // Apply plugin processing to the target.
+  $target->process = array();
+  $target->process[] = array('plugin' => $target->plugin);
   $link = _freelinking_build_link($target, $plugins);
 
   if (is_array($link)) {
@@ -206,15 +216,15 @@ function freelinking_get_link($target, $format = NULL) {
     return $link;
   }
 
-  if ($link['failover'] == 'error' || $link['failover'] == 'none') {
-    return theme('freelink_message', $target, $link['text']);
+  if ($link['action'] == FREELINKING_ERROR || $link['action'] == FREELINKING_CLEAN_TEXT) {
+    return theme('freelink_message', $target, $link['message']);
   }
 
   // If a theme function was written for a specific plugin, use that instead.
   if (function_exists('theme_freelink_' . $plugin)) {
-    return theme('freelink_' . $plugin, $link, $target);
+    return theme('freelink_' . $plugin, $link['link'], $target);
   }
-  return theme('freelink', $plugin, $link, $target);
+  return theme('freelink', $plugin, $link['link'], $target);
 }
 
 /**
@@ -224,72 +234,84 @@ function freelinking_get_link($target, $format = NULL) {
  * It works recursively to handle plugin failover.
  *
  * @param $target
- *  The link target object.
+ *    The link target object. Referenced.
  * @param $plugins
- *  All the Freelinking plugins.
+ *    All the Freelinking plugins. When _freelinking_build_link() is invoked
+ *    recursively, it removes the calling invocation's plugin. The results of a
+ *    processing by a given plugin do not change, so this is done to avoid
+ *    redundant processing and help break free of a runaway recursion.
  *
  * @return
- *  One of the following:
- *   - Array defining an error response
- *   - Array defining arguments for a link generated with l()
- *   - Scalar value holding arbitrary text. (This is an intended gap in the
- *     link-specific structure to allow Freelinking's sophisticated filtration/plugin
- *     mechanism to be used for other purposes.)
+ *   An associative array containing:
+ *     - link: (optional) On a successfully processing run, this contains the arguments
+ *       specified as parameters for l().
+ *     - action: (optional) A string indicating the currently processed result. Maybe be
+ *       one of the following values:
+ *       - error: The syntax processing resulted in an error. Display the value
+ *         of 'message' as an error.
+ *       - none: No transformation required.
+ *       - <plugin name>: The name of the plugin with which to retry link     
+ *       processing.
+ *     - text: (optional) A string explaining what happened, will be inserted into text 
+ *       in place of Freelinking syntax in the event of an Error.
+ *     - code: (optional) Code indicating what happened as a result of processing.
+ *       If no code is present, success is assumed and freelinking will proceed
+ *       to render the results. May be one of the following constants:
+ *       - FREELINKING_ERROR_NOT_FOUND: Drupal wanted to link to content, but
+ *         identified the link target as not found. This is usually coupled
+ *         with a faiover 'action'.
+ *       - FREELINKING_ERROR_ACCESS_DENIED: The target of the link is not
+ *         accessible to anonymous users. This will result in the link being
+ *         marked for post-cache reprocessing. This may be combined with a
+ *         failover or error action.
+ *       - FREELINKING_ERROR_BAD_REQUEST: Freelinking did not like what just
+ *         happened. This is usually combined with an 'error' or 'none' action.
+ *   The return value is inserted into the target object for the just-completed
+ *   process. While all elements of the array are optional, the 'link' value must be filled
+ *   unless an action is specified.
  */
 function _freelinking_build_link($target, $plugins) {
   // Get the current plugin.
-  $current = $target->plugin;
+  $current_step = array_pop($target->process);
 
   // Plugin not defined, fail gracefully.
-  if (empty($plugins[$current])) {
-    return array('failover' => 'error', 'message' => t('Missing Plugin'));
+  if (empty($plugins[$current_step['plugin'])) {
+    return array('action' => 'error', 'message' => t('Missing Plugin'));
   }
+  $plugin = $plugins[$current_step['plugin']];
 
   // Run the text through translation.
+  // Currently only the primary "goto" argument is translated.
   if ($plugin['translate']) {
-    if (empty($target->old_args['original']['goto']['original_goto']) {
-    /// shouldn't this be using $target->process[]?
-      $target->old_args['original']['goto'] = $target->args['goto'];
-    }
-    $translate = $target->old_args['original']['goto'] ? $target->old_args['original']['goto'] : $target->args['goto'];
-    $target->args['goto'] = strtr($translate, $plugin['translate']);
+    $translate = $target->args['goto'];
+    $current_step['args']['goto'] = strtr($translate, $plugin['translate']);
   }
 
-  // Record the target processing history.
-  $target['trace'][] = $current;
-
-  // Process simple replacement plugins with a standard callback.
-  if (valid_url($plugin['process'], TRUE)) {
-    $link = freelinking_simple_url_processor($target, $plugin)
+  // Attempt to process the target.
+  $current_step['result'] = $plugin['process callback']($target, $plugin);
+  // Push the current processing info back onto the target object. This is
+  // always the most recent element of the target 'process' array. This must be
+  // done before any recursion or the process order will get scrambled.
+  $target->process[] = $current_step;
+  // If the processing was rendered incomplete for access reasons, mark the
+  // target for followup processing after the cache.
+  if ($current_step['result']['code'] = FREELINKING_ERROR_ACCESS_DENIED) {
+    $target->post_process = TRUE;
+  }  
+  // The just-processed plugin cannot be processed for this target again.
+  unset($plugins[$plugin]['machine name']);
+  
+  // If the action is a plugin, failover to using that plugin.
+  if (in_array($current_step['result']['action'], array_keys($plugins))) {
+    $target['process'][] = array('plugin' => $current_step['result']['action']);
+    return _freelinking_build_link($target, $plugins);
   }
-  else {
-    $link = call_user_func_array($plugin['process'],
-      array($target, $plugin));
+  // The plugin requested the strange syntax be removed and the text left alone.
+  elseif ($current_step['result']['action'] == FREELINKING_CLEAN_TEXT) {
+     return freelinking_clean_text_processor($target, $plugin);
   }
-
-  // Process failover. "error" and "none" are reserved.
-  if (is_array($link) && isset($link['failover']) && $link['failover'] != 'error') {
-    // If failover is 'none', return cleaned text.
-    if ($link['failover'] == 'none') {
-      return freelinking_clean_text_processor($target, $plugin);
-    }
-
-    // Prepare for recursive failover processing.
-
-    // Store previous target arguments and overwrite if plugin defined new ones.
-    $target->old_args[$current] = $target->args
-    if (!empty($link['args'])) {
-      $target->args = $link['args'];
-    }
-
-    // Prevent recursion by removing previously processed plugin.
-    unset($plugins[$current]);
-    
-    $target->plugin = $link['failover'];
-    return _freelinking_build_freelink($target, $plugins);
-  }
-
-  return $link;
+  // The results are an error or a successful link. Return for processing.
+  return $current_state['result'];
 }
 
 // Helper Functions //

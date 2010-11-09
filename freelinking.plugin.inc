@@ -7,13 +7,6 @@
  */
 
 /**
- * Constants are used as plugin faiover return values.
- */
-define('FREELINKING_ERROR_NOT_FOUND', 404);
-define('FREELINKING_ERROR_ACCESS_DENIED', 403);
-define('FREELINKING_ERROR_BAD_REQUEST', 400 )
-
-/**
  * Generates an array of Freelinking plugins for link generation.
  * 
  * @param $format
@@ -26,6 +19,9 @@ define('FREELINKING_ERROR_BAD_REQUEST', 400 )
  *
  * @return
  *  An array of all plugins. Each plugin is itself an array.
+ *
+ * @todo
+ *  Wrap plugins in cache functionality, alter after cache_get.
  *
  * @see PLUGINS.mdown
  */
@@ -49,9 +45,22 @@ function freelinking_get_plugins($format = 'all', $syntax_patterns = NULL) {
 }
 
 /**
- * Standardize plugin definition.
- * @todo
- *  1. access arguments may be dropped.
+ * Standardize the plugin definition for element type and default values.
+ *
+ * @param string $name
+ *   The machine name of the plugin.
+ * @param array $plugin 
+ *   The plugin defintion as defined in hook_freelinking_plugin_info().
+ * @param $format
+ *   The specific text format for which the plugin is being prepared.
+ *   This parameter allows plugins to be treated differently based on
+ *   per-format settings. Nothing is currently in place for this.
+ *
+ * @return array
+ *   The standardized plugin definition.
+ * 
+ * @todo Access arguments may be dropped.
+ * @todo What is a process argument, really?
  */
 function _freelinking_normalize_plugin($name, $plugin, $format) {
    $plugin += array(
@@ -70,7 +79,7 @@ function _freelinking_normalize_plugin($name, $plugin, $format) {
   }
 
   // Standardize various elements as arrays.
-  if (!is_array($plugin['indicator'])) {
+  if (isset($plugin['indicator']) && !is_array($plugin['indicator'])) {
     $plugin['indicator'] = array($plugin['indicator']);
   } 
   if (isset($plugin['settings']) && !is_array($plugin['settings'])) {
@@ -198,8 +207,7 @@ function freelinking_purge_disabled_plugins(&$plugins) {
  */
 function freelinking_clean_text_processor($target, $plugin) {
   return array(
-    'failover' => 'error',
-    'message' => $target->args['text'] ? $target->args['text'] : $target->args['goto'],
+    'text' => $target->args['text'] ? $target->args['text'] : $target->args['goto'],
   );
 }
 
@@ -263,8 +271,7 @@ function freelinking_link_access($path, $cached = TRUE) {
  *  Boolean. If FALSE, the plugin is invalid.
  *
  * @todo
- *  1. Build drush/admin UI that makes use of this function.
- *  2. Check machine name validity, both array key and machine_name element.
+ *  1. Build drush command or admin UI that makes use of this function. Developer tool.
  */
 function _freelinking_validate_plugin($plugin, $patterns) {
   // Explanation for why a plugin may be invalid.
